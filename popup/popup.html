@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ElevenLabs Voice Reader</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="brand-text">
+          <h1>ElevenLabs</h1>
+          <span class="badge" id="modelBadge">eleven_v4</span>
+        </div>
+      </div>
+      <button id="toggleSettingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </header>
+
+    <!-- API Key Notice (hidden when key is present) -->
+    <div id="apiKeyBanner" class="alert-banner hidden">
+      <span>API key needed to generate audio.</span>
+      <button id="bannerSetupBtn" class="link-btn">Configure</button>
+    </div>
+
+    <!-- Settings Panel (Collapsible) -->
+    <div id="settingsPanel" class="settings-panel hidden">
+      <div class="panel-header">
+        <h2>Extension Settings</h2>
+        <button id="closeSettingsBtn" class="close-btn">&times;</button>
+      </div>
+
+      <div class="form-group">
+        <label for="apiKeyInput">ElevenLabs API Key</label>
+        <div class="input-with-button">
+          <input type="password" id="apiKeyInput" placeholder="sk_..." autocomplete="off">
+          <button id="toggleKeyVisibilityBtn" class="sub-btn" type="button">Show</button>
+        </div>
+        <small class="helper-text">Stored locally in your browser.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="modelIdInput">Model ID</label>
+        <input type="text" id="modelIdInput" value="eleven_v4" list="modelSuggestions">
+        <datalist id="modelSuggestions">
+          <option value="eleven_v4">eleven_v4 (Latest)</option>
+          <option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
+          <option value="eleven_turbo_v2_5">eleven_turbo_v2_5</option>
+          <option value="eleven_flash_v2_5">eleven_flash_v2_5</option>
+        </datalist>
+        <small class="helper-text">Configured for <code>eleven_v4</code>.</small>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label for="stabilityInput">Stability: <span id="stabilityVal">0.50</span></label>
+          <input type="range" id="stabilityInput" min="0" max="1" step="0.05" value="0.5">
+        </div>
+        <div class="form-group half">
+          <label for="similarityInput">Clarity: <span id="similarityVal">0.75</span></label>
+          <input type="range" id="similarityInput" min="0" max="1" step="0.05" value="0.75">
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button id="testApiKeyBtn" class="btn secondary-btn" type="button">Verify & Refresh</button>
+        <button id="saveSettingsBtn" class="btn primary-btn" type="button">Save Settings</button>
+      </div>
+
+      <div id="accountInfo" class="account-info hidden"></div>
+    </div>
+
+    <!-- Main Reader Interface -->
+    <main class="main-content" id="mainContent">
+      <!-- Voice Selection -->
+      <div class="form-group">
+        <div class="label-row">
+          <label for="voiceSelect">Voice</label>
+          <button id="previewVoiceBtn" class="text-link" title="Listen to voice sample">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Preview
+          </button>
+        </div>
+        <select id="voiceSelect" class="select-input">
+          <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Calm, Female)</option>
+          <option value="JBFqnCBsd6RMkjVDRZzb">George (Warm, Male)</option>
+          <option value="pNInz6obpgDQGcFmaJgB">Adam (Deep, Male)</option>
+          <option value="EXAVITQu4vr4xnSDxMaL">Bella (Soft, Female)</option>
+          <option value="ErXwobaYiN019PkySvjV">Antoni (Clear, Male)</option>
+          <option value="MF3mGyEYCl7XYWbV9V6O">Elli (Expressive, Female)</option>
+          <option value="TxGEqnHWrfWFTfGW9XjX">Josh (Narrative, Male)</option>
+        </select>
+      </div>
+
+      <!-- Text Input -->
+      <div class="form-group">
+        <div class="label-row">
+          <label for="textInput">Text</label>
+          <button id="getSelectionBtn" class="text-link" title="Fetch selected text from webpage">
+            Paste Selection
+          </button>
+        </div>
+        <textarea id="textInput" placeholder="Enter text to speak, or highlight text on any webpage..." rows="4"></textarea>
+        <div class="textarea-footer">
+          <span id="charCount" class="char-count">0 characters</span>
+          <button id="clearTextBtn" class="clear-btn">Clear</button>
+        </div>
+      </div>
+
+      <!-- Finer Playback Speed Control -->
+      <div class="speed-control-card">
+        <div class="speed-header">
+          <label for="speedSlider">Speed</label>
+          <div class="speed-controls-group">
+            <button id="speedDecBtn" class="speed-step-btn" type="button" title="Decrease speed by 0.05x" aria-label="Decrease speed">−</button>
+            <span id="speedVal" class="speed-readout">1.00x</span>
+            <button id="speedIncBtn" class="speed-step-btn" type="button" title="Increase speed by 0.05x" aria-label="Increase speed">+</button>
+            <button id="resetSpeedBtn" class="speed-reset-btn" type="button" title="Reset to 1.00x">1.0x</button>
+          </div>
+        </div>
+        <div class="speed-slider-row">
+          <span class="speed-range-bound">0.5x</span>
+          <input type="range" id="speedSlider" min="0.5" max="2.5" step="0.05" value="1.0">
+          <span class="speed-range-bound">2.5x</span>
+        </div>
+      </div>
+
+      <!-- Generate Button -->
+      <button id="generateBtn" class="btn primary-btn play-btn">
+        <span id="btnIcon">
+          <span id="btnSpinner" class="spinner hidden"></span>
+          <svg id="btnPlayIcon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+        </span>
+        <span id="btnText">Generate & Play</span>
+      </button>
+
+      <!-- Audio Player Card -->
+      <div id="playerCard" class="player-card hidden">
+        <div class="player-top">
+          <span class="now-playing-label" id="playerLabel">Now Playing</span>
+          <div class="player-buttons">
+            <a id="downloadAudioLink" class="icon-link" title="Download MP3" download="elevenlabs_speech.mp3">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        <audio id="audioElement" preload="auto"></audio>
+
+        <div class="scrubber-container">
+          <input type="range" id="seekSlider" min="0" max="100" value="0" step="0.1">
+          <div class="time-display">
+            <span id="currentTimeDisplay">0:00</span>
+            <span id="durationDisplay">0:00</span>
+          </div>
+        </div>
+
+        <div class="player-controls">
+          <button id="seekBackBtn" class="icon-control-btn" title="Back 5s">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 4v6h6"></path>
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+            </svg>
+          </button>
+          
+          <button id="playPauseBtn" class="play-circle-btn" title="Play / Pause">
+            <svg id="playIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <svg id="pauseIcon" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+          </button>
+
+          <button id="seekForwardBtn" class="icon-control-btn" title="Forward 5s">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"></path>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- History Section -->
+      <div id="historySection" class="history-section hidden">
+        <div class="section-title">
+          <span>Recent Audio</span>
+          <button id="clearHistoryBtn" class="text-link">Clear</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </main>
+
+    <!-- Status toast message -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
