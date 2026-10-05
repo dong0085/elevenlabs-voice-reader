@@ -1,0 +1,90 @@
+name: Package and Release Extension
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'manifest.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check version bump
+        id: version_check
+        run: |
+          CURRENT_VERSION=$(node -p "require('./manifest.json').version")
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Current version: $CURRENT_VERSION"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Workflow manually triggered, proceeding with bundle."
+            echo "should_bundle=true" >> "$GITHUB_OUTPUT"
+          else
+            PREV_VERSION=""
+            if git rev-parse HEAD~1 >/dev/null 2>&1; then
+              PREV_VERSION=$(git show HEAD~1:manifest.json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0, 'utf-8')).version" 2>/dev/null || echo "")
+            fi
+            echo "Previous version: $PREV_VERSION"
+
+            if [ "$CURRENT_VERSION" != "$PREV_VERSION" ]; then
+              echo "Version bumped from '$PREV_VERSION' to '$CURRENT_VERSION'."
+              echo "should_bundle=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Version was not changed. Skipping bundling."
+              echo "should_bundle=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Build zip bundle
+        if: steps.version_check.outputs.should_bundle == 'true'
+        run: |
+          VERSION="${{ steps.version_check.outputs.current_version }}"
+          ZIP_NAME="elevenlabs-voice-reader-v${VERSION}.zip"
+          zip -r "$ZIP_NAME" manifest.json background.js content.js content.css popup icons README.md
+          echo "ZIP_FILE=$ZIP_NAME" >> "$GITHUB_ENV"
+          echo "ZIP_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Validate bundle with addons-linter
+        if: steps.version_check.outputs.should_bundle == 'true'
+        run: |
+          npx --yes addons-linter "$ZIP_FILE"
+
+      - name: Upload artifact to run
+        if: steps.version_check.outputs.should_bundle == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: elevenlabs-voice-reader-v${{ env.ZIP_VERSION }}
+          path: ${{ env.ZIP_FILE }}
+
+      - name: Create GitHub Release
+        if: steps.version_check.outputs.should_bundle == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${ZIP_VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Uploading zip asset..."
+            gh release upload "$TAG" "$ZIP_FILE" --clobber
+          else
+            echo "Creating new release $TAG..."
+            gh release create "$TAG" "$ZIP_FILE" \
+              --title "Release $TAG" \
+              --generate-notes
+          fi
